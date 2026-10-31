@@ -29,6 +29,18 @@ Não foram encontrados campos nulos na leitura atual. A combinação `(codigo_ib
 
 `avg_rain` tem até 16 casas decimais; latitude tem até 15 e longitude até 14. Reduzi-las a duas casas mudaria os valores. Há valores como `-999.0` no índice UV e valores negativos em X1; eles serão preservados como números, sem interpretação automática como ausência de informação.
 
+### 2.1 Origem dos arquivos
+
+Os arquivos utilizados nesta versão do projeto foram obtidos a partir dos seguintes
+datasets públicos do Kaggle:
+
+- [Agroclimatology data of the state of Paraná - BR](https://www.kaggle.com/datasets/hugovallejo/agroclimatology-data-of-the-state-of-paran-br): origem do arquivo `raw/agroclimatology.csv`, com os registros climáticos utilizados na tabela `agroclimatology`.
+- [Agro_data](https://www.kaggle.com/datasets/harshpatel66/agro-data): origem dos arquivos `raw/produtividade_soja.csv`, `raw/X1.csv` e `raw/y1.csv`, usados nas tabelas de produtividade da soja e de produção/produtividade do arroz.
+
+Os arquivos foram incorporados ao projeto como dados de entrada locais. O pipeline
+preserva os dados brutos no schema `raw` e aplica somente as transformações descritas
+nesta especificação no schema `refined`.
+
 ## 3. Identidade de X1 e y1
 
 Os dois arquivos têm a mesma quantidade de registros e não contêm identificadores. O usuário aprovou a correspondência da linha N de X1 com a linha N de y1.
