@@ -19,6 +19,31 @@ from pipeline.contrato import TABELAS
 from pipeline.db import BANCO, RAIZ, identificador
 
 CONTRATOS = {t.nome: t for t in TABELAS}
+KG_POR_SACA = 60
+
+
+def formatar_sacas(valor: float | int | None) -> str:
+    """Formata sacas em escala legível, preservando a unidade no rótulo."""
+    if valor is None or pd.isna(valor):
+        return "—"
+    valor = float(valor)
+    sinal = "-" if valor < 0 else ""
+    absoluto = abs(valor)
+    if absoluto >= 1_000_000:
+        return f"{sinal}{absoluto / 1_000_000:.1f} milhões de sacas"
+    if absoluto >= 1_000:
+        return f"{sinal}{absoluto / 1_000:.1f} mil sacas"
+    return f"{sinal}{absoluto:.1f} sacas"
+
+
+def toneladas_para_sacas(valor: pd.Series) -> pd.Series:
+    """Converte toneladas em sacas de 60 kg para exibição no dashboard."""
+    return valor * 1_000 / KG_POR_SACA
+
+
+def kg_para_sacas(valor: pd.Series) -> pd.Series:
+    """Converte kg em sacas de 60 kg para exibição no dashboard."""
+    return valor / KG_POR_SACA
 
 
 def consultar(sql: str, parametros: list | None = None) -> pd.DataFrame:
@@ -232,7 +257,7 @@ def painel_consulta() -> None:
         st.dataframe(estrutura, hide_index=True, width="stretch")
 
 
-def painel_clima_soja() -> None:
+def painel_clima() -> None:
     municipios = consultar(
         "SELECT DISTINCT a.codigo_ibge, coalesce(trim(s.nome), a.codigo_ibge) AS nome "
         "FROM refined.agroclimatology a LEFT JOIN refined.produtividade_soja s "
@@ -304,14 +329,25 @@ def painel_clima_soja() -> None:
     else:
         st.info("Não há medições com data para este município.")
 
-    st.subheader("Produtividade anual da soja")
+
+
+def painel_soja() -> None:
+    municipios = consultar(
+        "SELECT DISTINCT codigo_ibge, trim(nome) AS nome "
+        "FROM refined.produtividade_soja WHERE nivel='MU' "
+        "ORDER BY nome, codigo_ibge"
+    )
+    if municipios.empty:
+        st.info("Não há municípios disponíveis para a série da soja.")
+        return
+    rotulos = dict(zip(municipios["codigo_ibge"], municipios["nome"], strict=True))
+    codigo = st.selectbox(
+        "Município", list(rotulos), format_func=lambda c: f"{rotulos[c]} · {c}"
+    )
     soja = consultar(
         "SELECT * FROM refined.produtividade_soja WHERE codigo_ibge=? AND nivel='MU'",
         [codigo],
     )
-    if soja.empty:
-        st.info("Não há produtividade da soja para este município.")
-        return
     colunas = [
         c.destino
         for c in CONTRATOS["produtividade_soja"].colunas
@@ -320,27 +356,50 @@ def painel_clima_soja() -> None:
     serie_soja = pd.DataFrame(
         {
             "ano": [int(c.rsplit("_", 1)[1]) for c in colunas],
-            "produtividade": [soja.iloc[0][c] for c in colunas],
+            "produtividade_fonte": [soja.iloc[0][c] for c in colunas],
         }
     )
+    serie_soja["sacas_por_hectare"] = kg_para_sacas(
+        serie_soja["produtividade_fonte"]
+    )
+    ultimo = serie_soja.dropna(subset=["sacas_por_hectare"]).tail(1)
     st.caption(
         f"refined.produtividade_soja · {rotulos[codigo]} · "
-        f"{serie_soja['ano'].min()}–{serie_soja['ano'].max()} · unidade da fonte. "
-        "Esta série histórica não depende do ano escolhido para o clima."
+        f"{serie_soja['ano'].min()}–{serie_soja['ano'].max()}. "
+        "A série da fonte foi interpretada como kg/ha e convertida por 60 kg/saca."
     )
-    if serie_soja["produtividade"].notna().any():
+    if not ultimo.empty:
+        st.metric(
+            f"Produção equivalente em {int(ultimo.iloc[0]['ano'])}",
+            f"{ultimo.iloc[0]['sacas_por_hectare']:.1f} sacas/ha",
+            border=True,
+        )
+    if serie_soja["sacas_por_hectare"].notna().any():
         st.line_chart(
             serie_soja,
             x="ano",
-            y="produtividade",
+            y="sacas_por_hectare",
             x_label="Ano",
-            y_label="Produtividade da soja",
-            height=260,
+            y_label="Sacas por hectare",
+            height=300,
         )
     else:
         st.info("A série de produtividade está inteiramente nula.")
     with st.expander("Dados do gráfico de soja"):
-        st.dataframe(serie_soja, hide_index=True, width="stretch")
+        st.dataframe(
+            serie_soja,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "produtividade_fonte": st.column_config.NumberColumn(
+                    "Valor da fonte"
+                ),
+                "sacas_por_hectare": st.column_config.NumberColumn(
+                    "Sacas por hectare", format="%.1f"
+                ),
+            },
+            alt="Série histórica da produção equivalente de soja em sacas por hectare",
+        )
 
 
 def painel_arroz() -> None:
@@ -348,48 +407,70 @@ def painel_arroz() -> None:
         "SELECT x.amostra_id, x.producao_arroz, y.produtividade_arroz "
         "FROM refined.x1 x JOIN refined.y1 y USING (amostra_id) ORDER BY x.amostra_id"
     )
-    st.subheader("Produção e produtividade do arroz")
+    dados["producao_sacas"] = toneladas_para_sacas(dados["producao_arroz"])
+    total_sacas = dados["producao_sacas"].sum()
+    st.subheader("Produção de arroz")
     st.caption(
         "refined.x1 + refined.y1 · correspondência por amostra_id · "
-        "unidades da fonte; não há município ou ano nestes arquivos."
+        "RICE_PRODUCTION interpretado como toneladas e convertido em sacas de 60 kg."
     )
+    with st.container(horizontal=True):
+        st.metric("Produção total", formatar_sacas(total_sacas), border=True)
+        st.metric("Amostras", quantidade(len(dados)), border=True)
     validos = dados.dropna(subset=["producao_arroz", "produtividade_arroz"])
-    st.write(
-        f"{quantidade(len(dados))} amostras; "
-        f"{quantidade(len(validos))} com os dois valores."
-    )
+    st.caption(f"{quantidade(len(validos))} amostras com produção e produtividade preenchidas.")
     if validos.empty:
         st.info("Não há pares preenchidos para o gráfico.")
     else:
         st.scatter_chart(
             validos,
-            x="producao_arroz",
+            x="producao_sacas",
             y="produtividade_arroz",
-            x_label="Produção de arroz",
+            x_label="Produção de arroz (sacas)",
             y_label="Produtividade do arroz",
             height=420,
         )
     with st.expander("Amostras do gráfico"):
-        st.dataframe(dados, hide_index=True, width="stretch")
+        st.dataframe(
+            dados,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "producao_arroz": st.column_config.NumberColumn(
+                    "Produção na fonte"
+                ),
+                "producao_sacas": st.column_config.NumberColumn(
+                    "Produção (sacas)", format="%.1f"
+                ),
+            },
+            alt="Amostras de produção de arroz convertidas para sacas",
+        )
 
 
 def painel_dashboard() -> None:
-    st.header("Clima e produtividade")
-    visao = st.radio("Visão", ["Clima e soja", "Arroz"], horizontal=True)
-    disponiveis = tabelas_disponiveis("refined")
-    exigidas = (
-        ["agroclimatology", "produtividade_soja"]
-        if visao == "Clima e soja"
-        else ["x1", "y1"]
+    st.header("Dashboards por tema")
+    visao = st.segmented_control(
+        "Visão",
+        ["Clima", "Arroz", "Soja"],
+        default="Clima",
+        key="dashboard_visao",
     )
+    disponiveis = tabelas_disponiveis("refined")
+    exigidas = {
+        "Clima": ["agroclimatology"],
+        "Arroz": ["x1", "y1"],
+        "Soja": ["produtividade_soja"],
+    }[visao or "Clima"]
     ausentes = [nome for nome in exigidas if nome not in disponiveis]
     if ausentes:
         st.info("Execute o pipeline para disponibilizar: " + ", ".join(ausentes))
         return
-    if visao == "Clima e soja":
-        painel_clima_soja()
-    else:
+    if visao == "Clima":
+        painel_clima()
+    elif visao == "Arroz":
         painel_arroz()
+    else:
+        painel_soja()
 
 
 def executar_etapas(etapas: list[str]) -> tuple[bool, str]:
@@ -438,8 +519,10 @@ def painel_pipeline() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Clima Paraná", page_icon="🌱", layout="wide")
-    st.title("Clima Paraná")
+    st.set_page_config(
+        page_title="Agro dados", page_icon=":material/agriculture:", layout="wide"
+    )
+    st.title("Agro dados")
     pagina = st.sidebar.radio(
         "Navegação",
         ["Dashboard", "Consultar tabelas", "Consultas SQL", "Executar pipeline"],

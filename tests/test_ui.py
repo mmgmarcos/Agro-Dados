@@ -27,8 +27,12 @@ def test_dashboard_e_consulta_com_filtro(banco_ui: Path) -> None:
     app = AppTest.from_file(str(db.RAIZ / "ui.py"), default_timeout=30).run()
     assert not app.exception
     assert app.selectbox[0].value == "000"
-    assert len(app.get("vega_lite_chart")) == 2
-    app.radio[0].set_value("Arroz").run()
+    assert len(app.get("vega_lite_chart")) == 1
+    app.segmented_control[0].set_value("Arroz").run()
+    assert not app.exception
+    assert len(app.get("vega_lite_chart")) == 1
+    assert any("Produção total" in item.label for item in app.metric)
+    app.segmented_control[0].set_value("Soja").run()
     assert not app.exception
     assert len(app.get("vega_lite_chart")) == 1
     app.sidebar.radio[0].set_value("Consultar tabelas").run()
