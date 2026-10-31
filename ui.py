@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import altair as alt
 import duckdb
 import pandas as pd
 import streamlit as st
@@ -306,13 +307,30 @@ def painel_clima() -> None:
         calendario = pd.date_range(f"{ano}-01-01", f"{ano}-12-31", name="data_medicao")
         serie = dados.set_index("data_medicao").reindex(calendario).reset_index()
         if serie["valor"].notna().any():
-            st.line_chart(
-                serie,
-                x="data_medicao",
-                y="valor",
-                x_label="Data",
-                y_label=medida.replace("_", " ").capitalize(),
-                height=280,
+            grafico = (
+                alt.Chart(serie)
+                .mark_line()
+                .encode(
+                    x=alt.X(
+                        "data_medicao:T",
+                        title="Data",
+                        axis=alt.Axis(format="%b %Y", tickCount=12),
+                    ),
+                    y=alt.Y(
+                        "valor:Q",
+                        title=medida.replace("_", " ").capitalize(),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("data_medicao:T", title="Data", format="%d/%m/%Y"),
+                        alt.Tooltip("valor:Q", title="Valor"),
+                    ],
+                )
+            )
+            st.altair_chart(
+                grafico,
+                width="stretch",
+                theme=None,
+                alt="Série diária da medida climática com eixo temporal mensal",
             )
         else:
             st.info("Não há valores preenchidos para esta medida no período.")
@@ -418,7 +436,10 @@ def painel_arroz() -> None:
         st.metric("Produção total", formatar_sacas(total_sacas), border=True)
         st.metric("Amostras", quantidade(len(dados)), border=True)
     validos = dados.dropna(subset=["producao_arroz", "produtividade_arroz"])
-    st.caption(f"{quantidade(len(validos))} amostras com produção e produtividade preenchidas.")
+    st.caption(
+        f"{quantidade(len(validos))} amostras com produção e produtividade "
+        "preenchidas."
+    )
     if validos.empty:
         st.info("Não há pares preenchidos para o gráfico.")
     else:
