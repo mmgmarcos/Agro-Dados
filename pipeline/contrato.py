@@ -24,7 +24,7 @@ TABELAS = (
         "agroclimatology.csv",
         ("codigo_ibge", "data_medicao"),
         (
-            Coluna("data", "data_medicao", "DATE"),
+            Coluna("data", "data_medicao", "TIMESTAMP"),
             Coluna("codigo_ibge", "codigo_ibge", "VARCHAR"),
             Coluna("latitude", "latitude", "DECIMAL(18,15)"),
             Coluna("longitude", "longitude", "DECIMAL(18,15)"),

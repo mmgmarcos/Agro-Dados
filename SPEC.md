@@ -111,7 +111,7 @@ Chave: `(codigo_ibge, data_medicao)`.
 
 | Origem | Destino | Tipo |
 | --- | --- | --- |
-| data | data_medicao | DATE |
+| data | data_medicao | TIMESTAMP |
 | codigo_ibge | codigo_ibge | VARCHAR |
 | latitude | latitude | DECIMAL(18,15) |
 | longitude | longitude | DECIMAL(18,15) |
@@ -150,7 +150,7 @@ Chave: `(codigo_ibge, data_medicao)`.
 | ALLSKY_SFC_UVB | radiacao_uvb_superficie | DECIMAL(10,2) |
 | ALLSKY_SFC_UV_INDEX | indice_uv_superficie | DECIMAL(10,2) |
 
-`data` usa o formato `YYYYMMDD`, por exemplo `20030101`. Validar oito dígitos e converter com `STRPTIME(valor, '%Y%m%d')`, seguido de CAST para DATE. Datas inexistentes são erros; NULL continua NULL.
+`data` usa o formato `YYYYMMDD`, por exemplo `20030101`. Validar oito dígitos e converter com `STRPTIME(valor, '%Y%m%d')`, seguido de CAST para TIMESTAMP. Como a origem contém apenas a data, o horário resultante é `00:00:00`. Datas inexistentes são erros; NULL continua NULL.
 
 Nos nomes de radiação sem o sufixo `ceu_claro`, o campo de origem é ALLSKY: todas as condições de céu. Os campos de ondas curtas representam radiação descendente, e os campos de radiação fotossintética representam o total.
 

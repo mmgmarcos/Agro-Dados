@@ -27,7 +27,7 @@ def csvs(tmp_path: Path) -> Path:
                 linha = {
                     c.origem: (
                         "20040229"
-                        if c.tipo == "DATE"
+                        if c.tipo == "TIMESTAMP"
                         else "1.25"
                         if c.tipo.startswith("DECIMAL")
                         else "texto"

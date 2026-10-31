@@ -1,5 +1,5 @@
 import csv
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -63,7 +63,17 @@ def test_transformacao_preserva_dados_e_reexecucao(
     assert con.execute(
         "SELECT data_medicao, latitude, indice_uv_superficie "
         "FROM refined.agroclimatology WHERE codigo_ibge='000'"
-    ).fetchone() == (date(2004, 2, 29), Decimal("-23.304900000000001"), Decimal("-999"))
+    ).fetchone() == (
+        datetime(2004, 2, 29),
+        Decimal("-23.304900000000001"),
+        Decimal("-999"),
+    )
+    assert dict(
+        con.execute(
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_schema='refined' AND table_name='agroclimatology'"
+        ).fetchall()
+    )["data_medicao"] == "TIMESTAMP"
     assert con.execute("SELECT sum(chuva_media) FROM refined.x1").fetchone()[0] == (
         Decimal("125.06666666666668")
     )

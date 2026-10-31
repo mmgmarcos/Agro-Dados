@@ -12,8 +12,8 @@ from pipeline.db import conectar, criar_schema, identificador
 
 def expressao(coluna: Coluna, origem: str | None = None) -> str:
     campo = origem or identificador(coluna.origem)
-    if coluna.tipo == "DATE":
-        return f"CAST(STRPTIME({campo}, '%Y%m%d') AS DATE)"
+    if coluna.tipo == "TIMESTAMP":
+        return f"CAST(STRPTIME({campo}, '%Y%m%d') AS TIMESTAMP)"
     return f"CAST({campo} AS {coluna.tipo})"
 
 
@@ -94,7 +94,7 @@ def validar_conversoes(con: duckdb.DuckDBPyConnection, tabela: Tabela) -> None:
         ]
         if not valores:
             continue
-        if coluna.tipo == "DATE":
+        if coluna.tipo == "TIMESTAMP":
             for valor in valores:
                 if re.fullmatch(r"[0-9]{8}", valor) is None:
                     raise erro_valor(tabela, coluna, valor, "esperado YYYYMMDD")
