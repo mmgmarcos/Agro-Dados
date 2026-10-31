@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+agro.duckdb
+agro.duckdb.wal
+agro.duckdb.tmp/
+raw/agroclimatology.csv
