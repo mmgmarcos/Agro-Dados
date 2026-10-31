@@ -1,4 +1,4 @@
-# Clima Paraná
+# Agro Dados
 
 Pipeline local em Python 3.14, uv e DuckDB. O contrato está em [SPEC.md](SPEC.md).
 
